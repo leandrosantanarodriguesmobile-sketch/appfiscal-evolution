@@ -879,6 +879,9 @@ export class EvolutionStartupService extends ChannelStartupService {
   public async handleLabel() {
     throw new BadRequestException('Method not available on Evolution Channel');
   }
+  public async syncLabels() {
+    throw new BadRequestException('Method not available on Evolution Channel');
+  }
   public async receiveMobileCode() {
     throw new BadRequestException('Method not available on Evolution Channel');
   }

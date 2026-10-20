@@ -4255,8 +4255,36 @@ export class BaileysStartupService extends ChannelStartupService {
     }));
   }
 
-  public async handleLabel(data: HandleLabelDto) {
-    const whatsappContact = await this.whatsappNumber({ numbers: [data.number] });
+  /**
+   * [AppFiscal CRM] Ressincroniza etiquetas e associações com o WhatsApp sem reconectar: pede ao
+   * servidor os patches incrementais da coleção "regular" (onde vivem as etiquetas). O Baileys emite
+   * labels.edit / labels.association durante o processamento, e os webhooks saem normalmente.
+   * (Equivalente ao PR evolution-api#2421, não incorporado.)
+   */
+  public async syncLabels(): Promise<{ ok: boolean; message: string }> {
+    if (!this.client) {
+      throw new BadRequestException('Instance not connected');
+    }
+    try {
+      await this.client.resyncAppState(['regular'], false);
+      return { ok: true, message: 'labels resynced' };
+    } catch (error) {
+      this.logger.error(`syncLabels: ${error?.toString?.() || error}`);
+      throw new BadRequestException('Unable to resync labels', error?.toString?.() || String(error));
+    }
+  }
+
+  /**
+   * [AppFiscal CRM] Etiqueta por LID: o WhatsApp atual identifica a conversa por `…@lid`; a etiqueta
+   * aplicada no jid de número (`…@s.whatsapp.net`) é ignorada pelo celular (evolution-api#2524).
+   * Resolve número → LID pelo mapeamento do Baileys e aplica no LID. Aceita `number` já em `@lid`.
+   */
+  private async resolveLabelJid(number: string): Promise<string> {
+    const raw = String(number || '').trim();
+    if (raw.endsWith('@lid')) {
+      return raw;
+    }
+    const whatsappContact = await this.whatsappNumber({ numbers: [raw] });
     if (whatsappContact.length === 0) {
       throw new NotFoundException('Number not found');
     }
@@ -4264,19 +4292,36 @@ export class BaileysStartupService extends ChannelStartupService {
     if (!contact.exists) {
       throw new NotFoundException('Number is not on WhatsApp');
     }
+    let jid = contact.jid;
+    try {
+      const lid = await this.client?.signalRepository?.lidMapping?.getLIDForPN?.(jid);
+      if (lid && typeof lid === 'string') {
+        jid = lid;
+      }
+    } catch (error) {
+      this.logger.warn(`getLIDForPN(${jid}) falhou: ${error?.toString?.() || error}`);
+    }
+    if (!jid.endsWith('@lid')) {
+      this.logger.warn(`handleLabel: sem LID conhecido para ${jid}; aplicando no número (pode não refletir no celular)`);
+    }
+    return jid;
+  }
+
+  public async handleLabel(data: HandleLabelDto) {
+    const jid = await this.resolveLabelJid(data.number);
 
     try {
       if (data.action === 'add') {
-        await this.client.addChatLabel(contact.jid, data.labelId);
-        await this.addLabel(data.labelId, this.instanceId, contact.jid);
+        await this.client.addChatLabel(jid, data.labelId);
+        await this.addLabel(data.labelId, this.instanceId, jid);
 
-        return { numberJid: contact.jid, labelId: data.labelId, add: true };
+        return { numberJid: jid, labelId: data.labelId, add: true };
       }
       if (data.action === 'remove') {
-        await this.client.removeChatLabel(contact.jid, data.labelId);
-        await this.removeLabel(data.labelId, this.instanceId, contact.jid);
+        await this.client.removeChatLabel(jid, data.labelId);
+        await this.removeLabel(data.labelId, this.instanceId, jid);
 
-        return { numberJid: contact.jid, labelId: data.labelId, remove: true };
+        return { numberJid: jid, labelId: data.labelId, remove: true };
       }
     } catch (error) {
       throw new BadRequestException(`Unable to ${data.action} label to chat`, error.toString());
