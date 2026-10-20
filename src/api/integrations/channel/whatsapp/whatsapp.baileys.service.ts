@@ -4313,7 +4313,9 @@ export class BaileysStartupService extends ChannelStartupService {
       this.logger.warn(`getLIDForPN(${jid}) falhou: ${error?.toString?.() || error}`);
     }
     if (!jid.endsWith('@lid')) {
-      this.logger.warn(`handleLabel: sem LID conhecido para ${jid}; aplicando no número (pode não refletir no celular)`);
+      this.logger.warn(
+        `handleLabel: sem LID conhecido para ${jid}; aplicando no número (pode não refletir no celular)`,
+      );
     }
     return jid;
   }
