@@ -4261,15 +4261,23 @@ export class BaileysStartupService extends ChannelStartupService {
    * labels.edit / labels.association durante o processamento, e os webhooks saem normalmente.
    * (Equivalente ao PR evolution-api#2421, não incorporado.)
    */
-  public async syncLabels(): Promise<{ ok: boolean; message: string }> {
+  public async syncLabels(full = false): Promise<{ ok: boolean; message: string }> {
     if (!this.client) {
       throw new BadRequestException('Instance not connected');
     }
     try {
-      // Todas as coleções do estado do app: o celular pode gravar etiquetas fora da "regular".
       const colecoes: any[] = ['critical_block', 'critical_unblock_low', 'regular_high', 'regular_low', 'regular'];
+      if (full) {
+        // Quando o servidor responde 404 (item-not-found) pra versão guardada — a sessão ficou muito tempo
+        // fora e o servidor não tem mais os patches — o Baileys rc.9 desiste em silêncio e a versão fica
+        // presa. Zerar a versão força o retrato completo (return_snapshot) e realinha.
+        const zeradas: Record<string, null> = {};
+        for (const c of colecoes) zeradas[c] = null;
+        await this.client.authState.keys.set({ 'app-state-sync-version': zeradas } as any);
+        this.logger.info('syncLabels: versões do estado do app zeradas — pedindo retrato completo');
+      }
       await this.client.resyncAppState(colecoes, false);
-      return { ok: true, message: 'labels resynced (all collections)' };
+      return { ok: true, message: full ? 'labels resynced (full snapshot)' : 'labels resynced (incremental)' };
     } catch (error) {
       this.logger.error(`syncLabels: ${error?.toString?.() || error}`);
       throw new BadRequestException('Unable to resync labels', error?.toString?.() || String(error));

@@ -14,7 +14,7 @@ export class LabelController {
   }
 
   /** [AppFiscal CRM] força o WhatsApp a reenviar etiquetas e associações (sem reconectar). */
-  public async syncLabels({ instanceName }: InstanceDto) {
-    return await this.waMonitor.waInstances[instanceName].syncLabels();
+  public async syncLabels({ instanceName }: InstanceDto, full = false) {
+    return await this.waMonitor.waInstances[instanceName].syncLabels(full);
   }
 }

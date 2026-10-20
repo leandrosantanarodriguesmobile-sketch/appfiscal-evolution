@@ -30,13 +30,14 @@ export class LabelRouter extends RouterBroker {
 
         return res.status(HttpStatus.OK).json(response);
       })
-      // [AppFiscal CRM] GET /label/syncLabels/:instance
+      // [AppFiscal CRM] GET /label/syncLabels/:instance[?full=true]
       .get(this.routerPath('syncLabels'), ...guards, async (req, res) => {
+        const full = String(req.query?.full || '') === 'true';
         const response = await this.dataValidate<LabelDto>({
           request: req,
           schema: null,
           ClassRef: LabelDto,
-          execute: (instance) => labelController.syncLabels(instance),
+          execute: (instance) => labelController.syncLabels(instance, full),
         });
 
         return res.status(HttpStatus.OK).json(response);
