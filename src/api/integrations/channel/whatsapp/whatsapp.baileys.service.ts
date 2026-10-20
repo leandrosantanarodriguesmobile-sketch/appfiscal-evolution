@@ -4281,7 +4281,8 @@ export class BaileysStartupService extends ChannelStartupService {
    */
   private async resolveLabelJid(number: string): Promise<string> {
     const raw = String(number || '').trim();
-    if (raw.endsWith('@lid')) {
+    if (raw.endsWith('@lid') || raw.endsWith('@s.whatsapp.net')) {
+      // jid explícito: usa como veio (permite forçar número OU lid pra conversas endereçadas por número)
       return raw;
     }
     const whatsappContact = await this.whatsappNumber({ numbers: [raw] });
