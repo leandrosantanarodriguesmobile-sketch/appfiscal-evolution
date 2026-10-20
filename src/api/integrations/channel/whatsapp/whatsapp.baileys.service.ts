@@ -4266,8 +4266,10 @@ export class BaileysStartupService extends ChannelStartupService {
       throw new BadRequestException('Instance not connected');
     }
     try {
-      await this.client.resyncAppState(['regular'], false);
-      return { ok: true, message: 'labels resynced' };
+      // Todas as coleções do estado do app: o celular pode gravar etiquetas fora da "regular".
+      const colecoes: any[] = ['critical_block', 'critical_unblock_low', 'regular_high', 'regular_low', 'regular'];
+      await this.client.resyncAppState(colecoes, false);
+      return { ok: true, message: 'labels resynced (all collections)' };
     } catch (error) {
       this.logger.error(`syncLabels: ${error?.toString?.() || error}`);
       throw new BadRequestException('Unable to resync labels', error?.toString?.() || String(error));
