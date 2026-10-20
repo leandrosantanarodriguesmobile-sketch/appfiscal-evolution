@@ -61,7 +61,8 @@ export async function useMultiFileAuthStateRedisDb(
             ids.map(async (id) => {
               let value = await readData(`${type}-${id}`);
               if (type === 'app-state-sync-key' && value) {
-                value = proto.Message.AppStateSyncKeyData.create(value);
+                // [AppFiscal CRM] fromObject (não create): o keyData volta do cache como texto base64 (toJSON do protobuf) e create() o deixa como string → HKDF com bytes errados → "Invalid patch mac" em toda sincronização de estado (etiquetas) depois de um restart
+                value = proto.Message.AppStateSyncKeyData.fromObject(value);
               }
 
               data[id] = value;
