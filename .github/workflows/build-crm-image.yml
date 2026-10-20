@@ -1,0 +1,38 @@
+# =============================================================================
+# [AppFiscal CRM] Constrói a imagem Docker do Evolution remendado (branch crm-2.3.7) no runner do
+# GitHub (a VM de 2 GB não aguenta o build) e manda o arquivo da imagem por scp pra VM appfiscal-crm.
+# De lá ela é carregada na VM evolution-api pela rede interna (ver README-CRM.md).
+#
+#   gh workflow run build-crm-image.yml --repo leandrosantanarodriguesmobile-sketch/appfiscal-evolution
+#
+# Segredo: DEPLOY_SSH_KEY (chave autorizada em crm@VM). Variável: DEPLOY_HOST.
+# =============================================================================
+name: Build imagem CRM
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: crm-2.3.7
+
+      - name: Build da imagem
+        run: |
+          docker build -t appfiscal-evolution:crm .
+          docker save appfiscal-evolution:crm | gzip -1 > /tmp/appfiscal-evolution-crm.tgz
+          ls -la /tmp/appfiscal-evolution-crm.tgz
+
+      - name: Enviar pra VM
+        env:
+          HOST: ${{ vars.DEPLOY_HOST }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy && chmod 600 ~/.ssh/deploy
+          ssh-keyscan -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          scp -i ~/.ssh/deploy /tmp/appfiscal-evolution-crm.tgz crm@$HOST:/home/crm/appfiscal-evolution-crm.tgz
+          ssh -i ~/.ssh/deploy crm@$HOST "ls -la /home/crm/appfiscal-evolution-crm.tgz && sha256sum /home/crm/appfiscal-evolution-crm.tgz"
